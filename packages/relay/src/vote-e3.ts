@@ -214,6 +214,36 @@ export class VoteE3Coordinator {
     return next;
   }
 
+  // Local nonce lane. The public RPCs are load-balanced: the node that just
+  // served a receipt is not necessarily the node that answers
+  // getTransactionCount, so back-to-back facilitator txs (approve → request)
+  // can be handed the same nonce and the second is rejected "nonce too low"
+  // (seen on the 2026-09-14 pre-show probe). enqueueTx already serializes
+  // sends; this pins each one to max(chain pending, local next) and resyncs
+  // from the chain after any send or receipt failure (dropped tx, reorg).
+  private nextNonce: number | null = null;
+
+  private async sendWithNonce(fn: (nonce: number) => Promise<Hex>): Promise<Hex> {
+    const chainNonce = await this.pub.getTransactionCount({ address: this.account.address, blockTag: "pending" });
+    const nonce = this.nextNonce == null ? chainNonce : Math.max(chainNonce, this.nextNonce);
+    this.nextNonce = nonce + 1;
+    try {
+      return await fn(nonce);
+    } catch (err) {
+      this.nextNonce = null;
+      throw err;
+    }
+  }
+
+  private async waitReceipt(hash: Hex) {
+    try {
+      return await this.pub.waitForTransactionReceipt({ hash, timeout: 300_000 });
+    } catch (err) {
+      this.nextNonce = null;
+      throw err;
+    }
+  }
+
   private note(pollId: string, patch: Parameters<VotingBooth["patchE3"]>[1], text: string, txHash?: string): void {
     this.booth.patchE3(pollId, patch, { text, txHash });
   }
@@ -314,9 +344,11 @@ export class VoteE3Coordinator {
         this.note(pollId, {}, `⛽ fee balance below this round's ~${feeStr} quote — topping up from the testnet faucet…`);
         try {
           const hash = await this.enqueueTx(() =>
-            this.wallet.writeContract({ address: FAUCET as Hex, abi: faucetAbi, functionName: "faucet", account: this.account, chain: CFG.chain }),
+            this.sendWithNonce(nonce =>
+              this.wallet.writeContract({ address: FAUCET as Hex, abi: faucetAbi, functionName: "faucet", account: this.account, chain: CFG.chain, nonce }),
+            ),
           );
-          await this.pub.waitForTransactionReceipt({ hash, timeout: 300_000 });
+          await this.waitReceipt(hash);
           this.note(pollId, {}, "⛽ fee tokens refilled", hash);
         } catch (err) {
           // Faucet may be dry or rate-limited; proceed and let request() report if truly empty.
@@ -340,16 +372,19 @@ export class VoteE3Coordinator {
     if (allowance < maxFee) {
       this.note(pollId, {}, `💸 approving ~${feeStr} fee for the Interfold…`);
       const hash = await this.enqueueTx(() =>
-        this.wallet.writeContract({
-          address: feeToken,
-          abi: erc20Abi,
-          functionName: "approve",
-          args: [INTERFOLD, maxFee],
-          account: this.account,
-          chain: CFG.chain,
-        }),
+        this.sendWithNonce(nonce =>
+          this.wallet.writeContract({
+            address: feeToken,
+            abi: erc20Abi,
+            functionName: "approve",
+            args: [INTERFOLD, maxFee],
+            account: this.account,
+            chain: CFG.chain,
+            nonce,
+          }),
+        ),
       );
-      await this.pub.waitForTransactionReceipt({ hash, timeout: 300_000 });
+      await this.waitReceipt(hash);
       this.note(pollId, {}, "💸 fee approved", hash);
     }
 
@@ -374,16 +409,19 @@ export class VoteE3Coordinator {
     });
     const simulatedE3Id = (sim.result as readonly [bigint, unknown])[0];
     const reqHash = await this.enqueueTx(() =>
-      this.wallet.writeContract({
-        address: INTERFOLD,
-        abi: interfoldAbi,
-        functionName: "request",
-        args: [reqParams],
-        account: this.account,
-        chain: CFG.chain,
-      }),
+      this.sendWithNonce(nonce =>
+        this.wallet.writeContract({
+          address: INTERFOLD,
+          abi: interfoldAbi,
+          functionName: "request",
+          args: [reqParams],
+          account: this.account,
+          chain: CFG.chain,
+          nonce,
+        }),
+      ),
     );
-    const receipt = await this.pub.waitForTransactionReceipt({ hash: reqHash, timeout: 300_000 });
+    const receipt = await this.waitReceipt(reqHash);
     // e3Id rides the E3Requested event data. Decode by ABI rather than a
     // pinned topic hash; if upstream reshaped the E3 struct (which
     // changes the topic), fall back to the simulated id.
@@ -488,15 +526,18 @@ export class VoteE3Coordinator {
     const e3Id = poll?.e3?.e3Id;
     if (!e3Id) return;
     this.enqueueTx(async () => {
-      const hash = await this.wallet.writeContract({
-        address: E3_PROGRAM,
-        abi: programAbi,
-        functionName: "publishInput",
-        args: [BigInt(e3Id), toHex(ct)],
-        account: this.account,
-        chain: CFG.chain,
-      });
-      await this.pub.waitForTransactionReceipt({ hash, timeout: 300_000 });
+      const hash = await this.sendWithNonce(nonce =>
+        this.wallet.writeContract({
+          address: E3_PROGRAM,
+          abi: programAbi,
+          functionName: "publishInput",
+          args: [BigInt(e3Id), toHex(ct)],
+          account: this.account,
+          chain: CFG.chain,
+          nonce,
+        }),
+      );
+      await this.waitReceipt(hash);
       const prior = this.booth.list().find(p => p.id === pollId)?.e3?.ballotTxs ?? [];
       this.note(
         pollId,
@@ -536,16 +577,19 @@ export class VoteE3Coordinator {
     for (let attempt = 1; ; attempt++) {
       try {
         outputTx = await this.enqueueTx(() =>
-          this.wallet.writeContract({
-            address: INTERFOLD,
-            abi: interfoldAbi,
-            functionName: "publishCiphertextOutput",
-            args: [e3Id, sumHex, commitment, DEV_PROOF],
-            account: this.account,
-            chain: CFG.chain,
-          }),
+          this.sendWithNonce(nonce =>
+            this.wallet.writeContract({
+              address: INTERFOLD,
+              abi: interfoldAbi,
+              functionName: "publishCiphertextOutput",
+              args: [e3Id, sumHex, commitment, DEV_PROOF],
+              account: this.account,
+              chain: CFG.chain,
+              nonce,
+            }),
+          ),
         );
-        await this.pub.waitForTransactionReceipt({ hash: outputTx, timeout: 300_000 });
+        await this.waitReceipt(outputTx);
         break;
       } catch (err) {
         const message = String(err);
