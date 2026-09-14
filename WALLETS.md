@@ -41,16 +41,19 @@ broadcast machine via OBS Multi-RTMP — keys never leave that box.
 ### Contract — `SlopComputer.sol` (episode registry)
 
 > ⚠️ **Ownership changed with the registry migration.** The live contract is
-> now `SlopComputer` at `0xf3ce3614fe8cd4294a0bf05d10cfda9d9cbc4886`, owned by
-> **austingriffith.eth** (`0x34aA3F…fDF3`) — *not* clawdbotatg.eth. This is
-> intentional: the contracts-repo deploy script reverts unless the owner is
-> atg.eth on live networks. The old `SlopComputerFrontpage.sol`
-> (`0x94D987…7820`, owned by clawdbotatg.eth) is deprecated/unused.
+> `SlopComputer` at `0xf3ce3614fe8cd4294a0bf05d10cfda9d9cbc4886`. As of
+> 2026-09-14 `owner()` is **slop.atg.eth** (`0x307c8c89…7Ab0`) — Austin's
+> dedicated slop wallet — *not* clawdbotatg.eth and no longer austingriffith.eth
+> (`0x34aA3F…fDF3`, the original owner, which stays a relay/admin delegate).
+> The old `SlopComputerFrontpage.sol` (`0x94D987…7820`, owned by
+> clawdbotatg.eth) is deprecated/unused.
 >
 > Net effect: **the contract owner (registry writes: `goLive`, `addEpisode`,
-> `setName`, `execute`) is now Austin's wallet**, while the *relay* broadcast
-> admin below is still clawdbotatg.eth. Going live is driven from the
-> slop.computer/admin console signing as austingriffith.eth.
+> `setManifest`, `setName`, `execute`) is slop.atg.eth**, while the *relay*
+> broadcast admin below is still clawdbotatg.eth. Going live is driven from the
+> slop.computer/admin console signing as slop.atg.eth. `slopcomputer.eth`
+> itself (ENS contenthash for the mirror, subname creation in the ENS app)
+> is still owned by austingriffith.eth — that is a different wallet.
 
 `goLive()`, `goOffline()`, `addEpisode()`, `setName()`, `execute()` are all
 `onlyOwner`. Verify with:

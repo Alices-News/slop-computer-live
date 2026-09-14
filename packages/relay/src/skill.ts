@@ -111,6 +111,8 @@ export const SKILL_TOPICS = [
   "news",
   "feeds",
   "wallet",
+  "voting",
+  "privacy",
   "clock",
   "card",
   "episode",
@@ -233,6 +235,7 @@ Returns the canonical desktop snapshot for one room. Top-level fields:
 | \`wallet\` | \`WalletRecord \\| null\` | Current multisig for this room |
 | \`walletDraft\` | \`WalletDraft \\| null\` | Collaborative pre-deploy form state |
 | \`walletTxs\` | \`WalletTx[]\` | Pending + recent multisig txs for this room |
+| \`voting\` | \`VotePollPublic[]\` | Voting Booth polls for this room (ciphertexts stripped; \`e3\` telemetry inline) — see \`/v1/skill/voting\` |
 | \`cardState\` | \`{ version } \\| null\` | Title card image presence (this room) |
 | \`cardJob\` | \`CardJob \\| null\` | In-flight card-generation job (this room) |
 | \`cardTitle\` | \`CardTitle \\| null\` | Shared title overlay text + position |
@@ -350,6 +353,8 @@ rules and recommended loops that aren't repeated here.
 | **News** (interleaved + AI-curated crypto/AI/tweets/Polymarket) | \`GET ${BASE}/v1/skill/news\` | read-only |
 | **Feeds** (ticker / headlines / timeline / polymarket details) | \`GET ${BASE}/v1/skill/feeds\` | read-only + host refresh |
 | **Wallet** (per-room multisig + tx queue) | \`GET ${BASE}/v1/skill/wallet\` | mostly read for agents |
+| **Voting** (private polls — threshold-FHE ballots settled by an Interfold E3 committee on-chain) | \`GET ${BASE}/v1/skill/voting\` | read + narrate via REST; create/cast are WS-only |
+| **Shield** (privacy wallet — Railgun via kohaku; deposit → shield → soak → fresh address) | \`GET ${BASE}/v1/skill/privacy\` | needs a signed-in wallet/passkey identity |
 | **Clock** (shared timer / countdown / time-zone) | \`GET ${BASE}/v1/skill/clock\` |  |
 | **Card** (per-room title card — AI gen + overlay) | \`GET ${BASE}/v1/skill/card\` |  |
 | **Episode** (sttOn flag + SSE stream) | \`GET ${BASE}/v1/skill/episode\` |  |
@@ -1367,19 +1372,26 @@ Known ids and their interactive surfaces:
 | \`chat\` | Shared chat panel | \`POST /v1/chat\` (see index) |
 | \`music\` | SLOPAMP player | \`GET /v1/skill/music\` |
 | \`chess\` | Chess game | \`GET /v1/skill/chess\` |
+| \`poker\` | No-Limit Hold'em tournament (real-ETH buy-ins via the room multisig) | \`GET /v1/skill/poker\` |
 | \`pong\` | 2-player real-time pong | \`GET /v1/skill/pong\` |
 | \`worm\` | up-to-4-player real-time snake | \`GET /v1/skill/worm\` |
+| \`putt\` | up-to-4-player turn-based mini golf | \`GET /v1/skill/putt\` |
 | \`todo\` | Shared todo list | \`GET /v1/skill/todo\` |
 | \`notes\` | Shared notes | \`GET /v1/skill/notes\` |
 | \`glossary\` | Shared glossary with AI TLDRs | \`GET /v1/skill/glossary\` |
 | \`gas\` | Gas tracker | \`GET /v1/skill/gas\` (read-only) |
 | \`clock\` | Clock + timer + countdown | \`GET /v1/skill/clock\` (per-room shared) |
-| \`wallet\` | Per-room multisig | \`GET /v1/skill/wallet\` |
+| \`wallet\` | Per-room multisig ("Bank") | \`GET /v1/skill/wallet\` |
+| \`mywallet\` | A passkey user's personal 1-of-2 slop multisig ("Wallet") — private window | no agent path; see the personal-wallet note in \`GET /v1/skill/wallet\` |
+| \`privacy\` | Shield — Railgun privacy wallet | \`GET /v1/skill/privacy\` |
+| \`voting\` | Voting Booth — private polls via Interfold E3 | \`GET /v1/skill/voting\` |
+| \`leftclaw\` | Hire — post jobs to Leftclaw Services | \`GET /v1/skill/leftclaw\` |
 | \`ens\` | ENS lookup app | no sub-skill; see \`GET /v1/ens/resolve\` in the browser sub-skill |
 | \`research\` | Guest research dossier | \`GET /v1/skill/research\` |
 | \`news\` | Curated news digest | \`GET /v1/skill/news\` |
 | \`transcript\` | Live STT feed | \`GET /v1/skill/transcript\` |
 | \`card\` | Title card overlay | \`GET /v1/skill/card\` |
+| \`abi-ninja\` / \`nifty-ink\` | Pinned shared-browser shortcuts (abi.ninja, nifty.ink) | \`GET /v1/skill/browser\` — plain \`url\` apps, nothing relay-side |
 | \`qr\` | QR generator | **room-shared** — \`POST /v1/qr { text, logoDataUrl?, clearLogo? }\` sets the code for everyone; read \`qrState\` in \`/v1/state\`. |
 
 The corresponding apps must exist in the catalog (\`GET /v1/state\`'s
@@ -1534,7 +1546,9 @@ are singleton windows shipped in the relay code. Anything you POST is a
 | \`"chat"\` | opens the chat singleton window |
 | \`"music"\` | opens the slopamp singleton window |
 | \`"chess"\` | opens the chess singleton window |
+| \`"poker"\` | opens the poker table window |
 | \`"pong"\` | opens the 2-player real-time pong game |
+| \`"putt"\` | opens the putt-putt window |
 | \`"worm"\` | opens the up-to-4-player real-time worm (snake) game |
 | \`"audio"\` | opens the audio share dialog (peer-only) |
 | \`"video"\` | opens the camera share dialog (peer-only) |
@@ -1546,6 +1560,10 @@ are singleton windows shipped in the relay code. Anything you POST is a
 | \`"gas"\` | opens the Ethereum gas tracker |
 | \`"clock"\` | opens the shared clock / countdown timer |
 | \`"wallet"\` | opens the multisig wallet window |
+| \`"mywallet"\` | opens the personal passkey wallet (private window, per user) |
+| \`"privacy"\` | opens the Shield privacy wallet |
+| \`"voting"\` | opens the Voting Booth |
+| \`"leftclaw"\` | opens the Hire (Leftclaw Services) window |
 | \`"ens"\` | opens the ENS lookup app |
 | \`"research"\` | opens the guest-research window |
 | \`"news"\` | opens the news digest window |
@@ -2813,6 +2831,223 @@ hasn't completed yet — re-read in a few seconds.
 }
 
 // =============================================================================
+// Voting (private polls via Interfold E3)
+// =============================================================================
+
+export function skillVoting(token: string, isHost: boolean, slug: string | null = null): string {
+  const scope = isHost ? "host" : "peer";
+  return `${header(token, scope, "")}
+
+## Voting sub-skill — the Voting Booth
+
+${slugNote(slug)}
+
+Per-room **private polls**. The question and the options are public;
+each ballot is a one-hot vector encrypted under a threshold-FHE
+(BFV) public key made by a **public Interfold ciphernode committee**,
+published on-chain, summed homomorphically, and only the *aggregate*
+is threshold-decrypted. Nobody — not the relay, not the host, not the
+chain — sees an individual vote. Who voted (address or anonymous id)
+and when IS visible; what they voted is not.
+
+### What an agent can actually do
+
+| Want | Path |
+| --- | --- |
+| See every poll + live protocol telemetry | \`GET ${BASE}/v1/state?slug=${slugStr(slug)}\` → \`voting: VotePollPublic[]\` (REST, token) |
+| Narrate the stages / results | read \`voting[].e3\` (below) and post to chat |
+| Create a poll / cast a ballot | **WebSocket only** (\`wss://live.slop.computer/signal\`, cookie session — see \`GET /v1/skill/ws\`). Casting also needs the committee key + the BFV wasm to encrypt (\`${BASE}/fhe-wasm/\`). Realistically: **ask the human at the desktop** to click the option. |
+
+There is no REST mutation for polls. Treat this app as **read + narrate**
+unless you hold a browser cookie session and can run the wasm.
+
+### Poll shape (\`/v1/state\`.\`voting[]\`)
+
+\`\`\`
+{
+  id, ts, question, options[],
+  status: "open" | "closed" | "revealed",
+  mode: "sepolia" | "mainnet" | "room",   # which Interfold deployment settled it ("room" = legacy in-browser committee)
+  creatorKey, address, handle, anonId,
+  committee: { size, threshold },
+  pubKeyLen,                               # bytes; the key itself rides vote_pubkey only
+  ballots: [{ voterKey, address, handle, anonId, ts, size, preview }],   # ciphertexts stripped
+  tally: number[] | null,                  # per-option counts once revealed
+  revealedAt,
+  e3: {                                    # live protocol telemetry
+    stage: "requesting" | "sortition" | "dkg" | "open" | "tallying" | "publishing" | "decrypting" | "revealed" | "failed",
+    message,                               # one-line narration of the current stage
+    log: [{ ts, text, txHash? }],          # newest last, capped
+    e3Id, requestTx, committee[], keyBytes,
+    windowStart, windowEnd,                # unix seconds — the on-chain voting window
+    ballotTxs: [{ voterKey, txHash }],     # every ballot's publishInput tx
+    outputTx, chain, interfold, program, error
+  }
+}
+\`\`\`
+
+### Lifecycle (what you will watch happen)
+
+1. \`vote_create\` → poll appears with \`status:"closed"\`, \`e3.stage:"requesting"\`.
+   The relay's facilitator key quotes + pays the E3 fee, tops up from
+   the faucet on Sepolia if short, and calls \`request()\` on Interfold.
+2. \`sortition\` → \`dkg\`: the public committee is drawn and publishes
+   the threshold key. \`e3.committee\` fills in.
+3. \`open\`: voting window is live (\`windowStart..windowEnd\`,
+   \`VOTING_E3_WINDOW_SECS\`, default 300 s). Ballots get an ack of
+   \`ok | not-found | closed | already-voted | full | bad-ballot\`; one
+   ballot per identity, max 64. **Voters pay no gas** — the facilitator
+   publishes each ciphertext on-chain (\`e3.ballotTxs\`).
+4. \`tallying\` → \`publishing\`: the window closes itself on-chain;
+   the relay sums the ciphertexts and publishes the encrypted tally.
+5. \`decrypting\` → \`revealed\`: the committee threshold-decrypts;
+   \`tally[]\` lands and \`status\` flips to \`revealed\`.
+
+A full round is **~7 minutes minimum** (window lead + window + DKG +
+decrypt). Budget for it before promising a result on air.
+
+### Honest caveats (say these, don't discover them)
+
+- **Which chain** is a relay-side switch (\`VOTING_E3_CHAIN\`), shown
+  in \`mode\` / \`e3.chain\`. Interfold's mainnet deployment has had
+  \`requestsPaused()\` set since 2026-08; polls there fail at pre-flight
+  with that message. Sepolia is the working demo path.
+- **Zero ballots = the poll fails** (\`e3.stage:"failed"\`, "window
+  closed with zero ballots"). Get at least one vote in.
+- **Ballot validity is not proven.** A malicious client could encrypt
+  a non-one-hot vector; the relay stores whatever decrypts to
+  plausible numbers. Compute proof to the E3 program is a dev stub
+  against a mock verifier — the count is *private*, not *verified*.
+- **A relay restart mid-window strands the poll** at "open" with no
+  retry; the creator can \`vote_remove\` it and start over.
+- \`vote_close\` / \`vote_reveal\` do nothing for E3 polls — the chain
+  closes the window. They only matter in legacy \`mode:"room"\` polls
+  (dev boxes with no E3 config), where the creator's browser IS the
+  committee and posts the tally itself.
+
+### WS verbs (cookie session)
+
+\`\`\`
+{ type: "vote_create",  question, options: [..2..8] }
+{ type: "vote_cast",    pollId, ct }          # ct = base64 BFV ciphertext, ≤ 2 MB
+   → { type: "vote_cast_ack", pollId, result }
+{ type: "vote_pubkey",  pollId }  → { type: "vote_pubkey",  pollId, pubKey }
+{ type: "vote_ballots", pollId }  → { type: "vote_ballots", pollId, pubKey, ballots: [{ ..., ct }] }
+{ type: "vote_close",   pollId }              # creator only; no-op for E3
+{ type: "vote_reveal",  pollId, tally: [] }   # creator only; no-op for E3
+{ type: "vote_remove",  pollId }              # creator only
+\`\`\`
+
+Broadcast: \`{ type: "voting", polls: VotePollPublic[] }\` on every
+change. The \`hello\` frame carries \`voting\`, \`votingE3\` (bool) and
+\`votingE3Chain\`.
+
+### Recipe — narrate a poll for the room
+
+\`\`\`bash
+curl -s -H "Authorization: Bearer ${token}" "${BASE}/v1/state?slug=${slugStr(slug)}" \\
+  | jq '.voting[-1] | {question, status, stage: .e3.stage, msg: .e3.message, ballots: (.ballots|length), tally}'
+\`\`\`
+
+Poll every ~10 s while \`e3.stage\` is not \`revealed\`/\`failed\`, and
+post one chat line per stage change (\`POST /v1/chat\`). Independent
+audit: \`vote_ballots\` returns every ciphertext + the committee key,
+so a client with the wasm can re-sum and compare against \`outputTx\`.
+`;
+}
+
+// =============================================================================
+// Shield (privacy wallet — Railgun via kohaku)
+// =============================================================================
+
+export function skillPrivacy(token: string, isHost: boolean, slug: string | null = null): string {
+  const scope = isHost ? "host" : "peer";
+  return `${header(token, scope, "")}
+
+## Shield sub-skill — the privacy wallet
+
+${slugNote(slug)}
+
+**Shield** breaks the on-chain link between where ETH came from and
+where it goes: deposit → auto-shield into Railgun → soak → unshield
+to a **fresh** address only you know. Ethereum **mainnet only**.
+
+**Say this out loud: it is custodial while funds are inside.** The
+box holds one Railgun wallet (the kohaku seed + master password live
+on the relay); every user's funds are commingled in that one balance
+and the relay keeps the per-user ledger. It buys *unlinkability*, not
+trustlessness — a deliberate exception to slop's no-server-held-keys
+posture, capped by \`caps.maxDepositEth\` / \`caps.maxSendEth\`.
+
+### Auth
+
+Every call needs a session with a **real address** (wallet SIWE or
+passkey) — anonymous / password-only sessions get 403. Your bearer
+token carries the address of the human who minted it. Per-user state
+is keyed by \`address + room\`, so pass \`?slug=\` consistently.
+When the box isn't configured every mutation returns **503**.
+
+### Read
+
+\`\`\`
+GET ${BASE}/v1/kohaku/state?slug=${slugStr(slug)}
+# → { ok, configured, state: null | {
+#       phase: "awaiting-deposit" | "shielding" | "soaking" | "withdrawing" | "wallet",
+#       busy, error, overCap,
+#       depositAddress, withdrawAddress,
+#       depositedEth, expectedNoteEth, withdrawnEth, pendingDepositEth,
+#       shieldTxHash, unshieldHash, shieldedAt, soakEndsAt, soakProgress, soakHours,
+#       anonymityShields,                     # how many other shields landed while you soaked
+#       poolSpendableEth, poolPendingEth, poolSyncedAt,
+#       activity: [...last 30],
+#       caps: { maxDepositEth, maxSendEth, minDepositEth },
+#       depositSuggestions: [{ depositEth, exitEth }]   # amounts that land on a clean denomination
+#     },
+#     walletBalanceEth,                       # balance at withdrawAddress once phase = "wallet"
+#     rpcUrl, defaultRpcUrl }
+\`\`\`
+
+\`state: null\` = this identity hasn't opened a cycle yet.
+
+### Lifecycle
+
+\`\`\`
+POST ${BASE}/v1/kohaku/open?slug=${slugStr(slug)}        # → { ok, depositAddress }  phase: awaiting-deposit
+   (human sends ETH ≥ caps.minDepositEth to depositAddress from any wallet)
+   → the 30 s watcher auto-shields                       # phase: shielding → soaking
+   (Railgun proof-of-innocence maturation ~30-45 min, then the soak, default 4 h)
+POST ${BASE}/v1/kohaku/withdraw?slug=${slugStr(slug)}    # unshield to a fresh address → phase: wallet
+POST ${BASE}/v1/kohaku/send?slug=${slugStr(slug)}        { to, amountWei } | { to, max: true }
+                                                          # spend from the fresh address
+POST ${BASE}/v1/kohaku/settings?slug=${slugStr(slug)}    { rpcUrl }   # your own mainnet RPC ("" resets)
+\`\`\`
+
+The default RPC is known to 429 on Railgun's \`eth_getLogs\` sync; if
+\`error\` mentions logs or sync, set a user RPC via \`settings\`.
+
+### Chat-driven spends
+
+\`\`\`
+POST ${BASE}/v1/kohaku/chat?slug=${slugStr(slug)}        { text }   # "send 0.01 to vitalik.eth" → proposal { id, ... }
+POST ${BASE}/v1/kohaku/execute?slug=${slugStr(slug)}     { id }     # execute a proposal from that thread
+\`\`\`
+
+Rate-limited per identity (chat ~3/min, execute ~2/min → 429).
+
+### Recipe — narrate someone's cycle
+
+\`\`\`bash
+curl -s -H "Authorization: Bearer ${token}" "${BASE}/v1/kohaku/state?slug=${slugStr(slug)}" \\
+  | jq '.state | {phase, soakProgress, anonymityShields, depositedEth, walletBalance: .withdrawnEth, error}'
+\`\`\`
+
+Don't promise a same-show exit: deposit → spendable is hours, not
+minutes. The demo-shaped move is opening a cycle live and showing a
+previous cycle's fresh-address balance.
+`;
+}
+
+// =============================================================================
 // Clock
 // =============================================================================
 
@@ -3349,6 +3584,10 @@ defense-in-depth measure.
 | \`wallet_tx_sign\` | sig | **WS-only** | sign a pending tx (needs a real signer's private key) |
 | \`wallet_tx_status\` / \`wallet_tx_remove\` / \`wallet_tx_resummarize\` | \`txId\`, ... | **WS-only** | tx-queue maintenance |
 | \`wallet_nested_request\` / \`wallet_nested_result\` | \`outerSlug\`, \`outerWalletAddress\`, \`outerTxId\`, sig | **WS-only** | nested-multisig signing (a room wallet that is itself a signer on another room's wallet) — real signers only |
+| \`vote_create\` | \`question\`, \`options[2..8]\` | **WS-only** | open a private poll — the relay requests an Interfold E3 and the public committee makes the key (see \`/v1/skill/voting\`) |
+| \`vote_cast\` | \`pollId\`, \`ct\` (base64 BFV ciphertext) | **WS-only** | cast an encrypted one-hot ballot; ack is \`vote_cast_ack { result }\` |
+| \`vote_pubkey\` / \`vote_ballots\` | \`pollId\` | **WS-only** | fetch the committee key / every ciphertext (reply only to you — too heavy for broadcasts) |
+| \`vote_close\` / \`vote_reveal\` / \`vote_remove\` | \`pollId\` (+ \`tally\`) | **WS-only** | creator-only; close/reveal are **no-ops for E3 polls** (the on-chain window closes them), remove deletes |
 
 **WS-only** in that table = no REST mirror. The big ones for agents to
 know about: \`card_title\` (the only way to drive the title overlay) and
@@ -3790,6 +4029,10 @@ export function skillForTopic(
       return skillFeeds(token, isHost, slug);
     case "wallet":
       return skillWallet(token, isHost, slug);
+    case "voting":
+      return skillVoting(token, isHost, slug);
+    case "privacy":
+      return skillPrivacy(token, isHost, slug);
     case "clock":
       return skillClock(token, isHost, slug);
     case "card":

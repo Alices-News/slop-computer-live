@@ -1570,6 +1570,7 @@ app.get("/v1/state", async (req, reply) => {
     wallet: roomFromReq(req).wallet.getCurrent(),
     walletDraft: roomFromReq(req).wallet.getDraft(),
     walletTxs: roomFromReq(req).wallet.listTxs(),
+    voting: roomFromReq(req).voting.list(),
     cardState: readCardSnapshot(roomFromReq(req).id),
     cardJob: readCardJob(roomFromReq(req).id),
     cardTitle: readCardTitle(roomFromReq(req).id),
