@@ -3503,7 +3503,7 @@ app.post("/v1/card/prompt", { bodyLimit: CARD_PROMPT_BODY_LIMIT }, async (req, r
   if (!vibe) {
     return reply.code(400).send({ error: "empty-prompt", note: 'POST {"prompt":"poker night"}' });
   }
-  if (vibe.length > 500) return reply.code(413).send({ error: "prompt-too-long" });
+  if (vibe.length > 4000) return reply.code(413).send({ error: "prompt-too-long" });
 
   const refs = parseCardRefImages(body?.images);
   if (!Array.isArray(refs)) return reply.code(400).send(refs);

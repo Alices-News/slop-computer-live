@@ -3172,7 +3172,7 @@ is cached 1h.
 \`\`\`
 POST ${BASE}/v1/card/prompt?slug=${slugStr(slug)}   { "prompt": "poker night, neon felt, ETH chips" }
 # → { ok: true, job: { startedAt, startedBy } }
-# 400 empty-prompt · 413 prompt-too-long (>500 chars) · 409 already-generating
+# 400 empty-prompt · 413 prompt-too-long (>4000 chars) · 409 already-generating
 
 # Optional style / subject references (≤4, jpeg|png|webp, ≤10 MB each):
 POST ${BASE}/v1/card/prompt?slug=${slugStr(slug)}   { "prompt": "poker night", "images": [{ "mime": "image/png", "data": "<base64>" }] }
