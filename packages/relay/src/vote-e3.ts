@@ -70,10 +70,16 @@ const CHAIN_DEFAULTS: Record<
   // (Interfold 0x64Cd…7f26) speaks the old ABI and is no longer used.
   sepolia: {
     chain: sepolia,
-    interfold: "0x38A8A686A420023568E995b57B4FBEA371555Ba7",
-    registry: "0xa639b9a7AB05B787fFE258735Cf9541152a0E610",
-    program: "0x3D3F84d5c9dd75027F8c9e0A2203bF6a82C972d2", // MockE3Program
-    faucet: "0xCb350D89ACf8FC1720e4BF2cF59B70f30F8D2DbA",
+    // Interfold redeployed Sepolia again (release v0.12.1, deploy block
+    // 11534993). The 0x38A8… generation is dead — a request there sits in
+    // sortition forever because no ciphernode watches it (2026-09-14 probe).
+    // Source of truth: deployments/manifest.json in theinterfold/interfold
+    // (networks.sepolia.contracts + reference.MockE3Program); their docs'
+    // `interfold config check` flags the old address as stale.
+    interfold: "0x3E856E24c7a95d0e04d387f847DA6FA9f6F6c20C",
+    registry: "0x374F4542eC634d5437Dd65020781A9D9Df9c2AB8",
+    program: "0x5874CD49929ffcf380C82cDE1e74188dEaff9791", // MockE3Program
+    faucet: "0x6e281411C055BEEbD74bDFcB9aB095aa98907F85",
     txRpc: "https://ethereum-sepolia-rpc.publicnode.com",
     logRpc: "https://ethereum-sepolia-rpc.publicnode.com",
     explorer: "https://sepolia.etherscan.io",
