@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { Address, AddressInput } from "@scaffold-ui/components";
 import {
   type Address as AddressType,
@@ -1099,6 +1100,12 @@ const ChainRow = ({
   const connectedChainId = useChainId() ?? mainnet.id;
   const { switchChainAsync, isPending: switching } = useSwitchChain();
   const { writeContractAsync, isPending: writePending } = useWriteContract();
+  // The relay says who the host is; wagmi says whether a wallet is actually
+  // connected in THIS tab. They drift (reload before auto-reconnect, session
+  // cookie outliving the connector) and writeContractAsync then throws
+  // ConnectorNotConnectedError — so check the connector here, not the role.
+  const { isConnected: walletConnected, address: walletAddress } = useAccount();
+  const { openConnectModal } = useConnectModal();
   const [txHash, setTxHash] = useState<`0x${string}` | null>(null);
   const {
     isLoading: receiptLoading,
@@ -1322,6 +1329,17 @@ const ChainRow = ({
       setErr("connect wallet first");
       return;
     }
+    if (!walletConnected || !walletAddress) {
+      setErr("wallet not connected in this tab — connect it, then deploy");
+      openConnectModal?.();
+      return;
+    }
+    if (walletAddress.toLowerCase() !== deployer.toLowerCase()) {
+      setErr(
+        `connected wallet ${walletAddress.slice(0, 6)}… is not the host wallet ${deployer.slice(0, 6)}… — the address is derived from the host, switch accounts`,
+      );
+      return;
+    }
     if (signers.length === 0) {
       setErr("pick at least one signer");
       return;
@@ -1361,7 +1379,20 @@ const ChainRow = ({
     } catch (e) {
       setErr(String(e).slice(0, 200));
     }
-  }, [canDeploy, deployer, signers, connectedChainId, chainId, switchChainAsync, writeContractAsync, threshold, salt]);
+  }, [
+    canDeploy,
+    deployer,
+    signers,
+    connectedChainId,
+    chainId,
+    switchChainAsync,
+    writeContractAsync,
+    threshold,
+    salt,
+    walletConnected,
+    walletAddress,
+    openConnectModal,
+  ]);
 
   const busy = writePending || receiptLoading || switching;
 
@@ -1477,7 +1508,9 @@ const ChainRow = ({
               ? "Waiting…"
               : !canDeploy
                 ? "Deploy (host only)"
-                : "Deploy"}
+                : !walletConnected
+                  ? "Connect wallet"
+                  : "Deploy"}
       </Button>
     );
   })();
