@@ -1,10 +1,10 @@
 "use client";
 
 import { useMemo } from "react";
-import { Address } from "@scaffold-ui/components";
 import type { Address as AddressType } from "viem";
 import { AddressBlockie } from "~~/components/scaffold-eth";
 import { BandFlag } from "~~/components/ui/BandFlag";
+import { EnsAddressRow } from "~~/components/ui/EnsAddressRow";
 import { useResolveWalletAddress } from "~~/components/ui/PasskeyWalletContext";
 import { bandsFromIdentity } from "~~/utils/blockieBands";
 
@@ -13,7 +13,7 @@ import { bandsFromIdentity } from "~~/utils/blockieBands";
 //   1. BandFlag — the chunky three-stripe swatch matching the user's
 //      cursor bands, so a glance maps name → cursor color.
 //   2. Either the user's chosen display name (when one is set) or the
-//      scaffold-ui <Address /> (ENS-or-short-address with avatar).
+//      EnsAddressRow (ENS-or-short-address with avatar, ipfs via bgipfs).
 //   3. AddressBlockie — only shown when a custom name is in use, since
 //      the custom name otherwise hides the underlying address; the
 //      blockie + copy icon keep the real identity recoverable.
@@ -82,7 +82,7 @@ export const SlopAddress = ({
         // and no copy icon, just the name.
         <span style={{ overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{customName}</span>
       ) : address ? (
-        <Address address={(displayAddress ?? address) as AddressType} size="xs" onlyEnsOrAddress disableAddressLink />
+        <EnsAddressRow address={displayAddress ?? address} />
       ) : (
         <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
           {handle ?? fallback?.slice(0, 6) ?? "anon"}
