@@ -106,7 +106,12 @@ const FAUCET = (process.env.VOTING_E3_FAUCET ?? CFG.faucet ?? "") as Hex | "";
 const TX_RPC = process.env.VOTING_E3_TX_RPC ?? CFG.txRpc;
 const LOG_RPC = process.env.VOTING_E3_LOG_RPC ?? CFG.logRpc;
 const WINDOW_SECS = Number(process.env.VOTING_E3_WINDOW_SECS ?? 300);
-const WINDOW_LEAD_SECS = 120;
+// Lead between request() and the input window opening. The window must
+// outlast committee DKG or ballots have nowhere to land: on the v0.12.1
+// Sepolia deployment request→key is ≥14 min at best (Interfold's own test
+// E3s use 20-min windows) — set VOTING_E3_LEAD_SECS≈1200 there. 120 s was
+// tuned for the July deployment and is kept as the default for mainnet.
+const WINDOW_LEAD_SECS = Number(process.env.VOTING_E3_LEAD_SECS ?? 120);
 
 const INPUT_DEADLINE_SELECTOR = "0xbf1af280"; // InputDeadlineNotReached(uint256,uint256)
 // Dev-mode compute "proof" (digits of pi) — accepted because the
