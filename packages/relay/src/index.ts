@@ -224,7 +224,7 @@ const sessionCookieOpts = (extra?: { maxAge?: number }) => {
     httpOnly: true,
     sameSite: (prod ? "none" : "lax") as "none" | "lax",
     secure: prod,
-    ...(prod ? { domain: ".slop.computer" } : {}),
+    ...(prod ? { domain: process.env.COOKIE_DOMAIN || ".slop.computer" } : {}),
     ...(extra?.maxAge !== undefined ? { maxAge: extra.maxAge } : {}),
   };
 };

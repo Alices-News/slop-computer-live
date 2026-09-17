@@ -24,6 +24,7 @@ Hostname swap `live.slop.computer` → `live.alices.news`, `media.slop.computer`
 | `packages/browser-host/.env.example` | Production CORS origin. |
 | `deploy/slop-broadcast.env.example` | God-mode URL on `live.alices.news`. Real `deploy/slop-broadcast.env` is gitignored. |
 | `ops/deploy.sh` | `PROD_HOST` and bundle needles, if we later use the Mac-build path. First bring-up builds on the VPS per `deploy/README.md`. |
+| `packages/relay/src/index.ts` | Production `slop_session` cookie domain reads `COOKIE_DOMAIN` (still defaults to `.slop.computer`). Without this, Set-Cookie is scoped to the parent fork domain and login never sticks on `live.alices.news`. |
 
 Checkout lives at `Alices News/slop-computer-live/`, not inside `alice-agent/`.
 
