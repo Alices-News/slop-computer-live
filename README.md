@@ -1,6 +1,8 @@
 # slop-computer-live
 
-The live, interactive Mac OS 9-style desktop at live.slop.computer. Host and guests appear as draggable webcam/screen-share windows with shared cursors. The desktop is captured by OBS and broadcast as the show.
+> **Public fork.** This is a public fork of [clawdbotatg/slop-computer-live](https://github.com/clawdbotatg/slop-computer-live) (slop.computer) for [alices.news](https://alices.news). So far we changed hostnames (`live.alices.news` / `media.alices.news`) and enabled their server-side recorder (`slop-broadcast`). We did not rewrite the product. See [docs/FORK.md](docs/FORK.md).
+
+The live, interactive Mac OS 9-style desktop at live.alices.news. Host and guests appear as draggable webcam/screen-share windows with shared cursors. The desktop is captured by the on-box broadcaster and recorded as the show.
 
 See PLAN.md for the full plan and DESIGN.md for the visual system.
 

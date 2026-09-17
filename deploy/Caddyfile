@@ -1,17 +1,17 @@
 # slop-computer-live reverse proxy
 #
-# Replace `live.slop.computer` and `media.slop.computer` with your real
+# Replace `live.alices.news` and `media.alices.news` with your real
 # domains. Caddy auto-fetches Let's Encrypt certs on first start
 # (ports 80 + 443 must be reachable).
 #
 # WebSockets are upgraded automatically by `reverse_proxy`.
 
-live.slop.computer {
+live.alices.news {
     encode zstd gzip
 
     # Relay HTTP routes (SIWE auth, admin start/stop, TURN creds, agent
     # API, public apps catalog) and WS /signal endpoint. NOTE: port 8081 —
-    # :8080 is owned by based-keno.
+    # :8080 is owned by based-keno / Endless Channel on this box.
     #
     # `/files/*` and `/avatars/*` are PUBLIC download endpoints (no auth
     # gate; ids are unguessable). Without them here, dropped images load
@@ -20,7 +20,7 @@ live.slop.computer {
     reverse_proxy @relay localhost:8081
 
     # Browser-host: shared headless Chrome with frame streaming + impersonator.
-    # Frontend connects to wss://live.slop.computer/browser/stream/<id>.
+    # Frontend connects to wss://live.alices.news/browser/stream/<id>.
     handle_path /browser/* {
         reverse_proxy localhost:8090
     }
@@ -29,30 +29,19 @@ live.slop.computer {
     reverse_proxy localhost:3000
 }
 
-media.slop.computer {
+media.alices.news {
     encode zstd gzip
-    # MediaMTX HLS output. The app speaks https://media.slop.computer/hls/live/index.m3u8
+    # MediaMTX HLS output. The app speaks https://media.alices.news/hls/live/index.m3u8
     # and MediaMTX serves at http://localhost:8888/live/index.m3u8 — strip the /hls prefix.
     handle_path /hls/* {
         reverse_proxy localhost:8888
     }
-    # Self-hosted IPFS path gateway. Episodes that were pinned by the relay
-    # (POST /api/v0/add to kubo on :5001) are reachable here at
-    # https://media.slop.computer/ipfs/<cid>. We use `handle` (not
-    # handle_path) so the /ipfs prefix is preserved — kubo's gateway
-    # routes on it.
-    handle /ipfs/* {
-        reverse_proxy localhost:8080
-    }
+    # Self-hosted IPFS path gateway. Optional. Left disabled on this fork:
+    # Kubo is not required for the recording gate, and localhost:8080 is
+    # already Endless Channel. Re-enable only after Kubo listens elsewhere.
+    # handle /ipfs/* {
+    #     reverse_proxy localhost:8080
+    # }
     # Bare-domain access still works for raw MediaMTX paths.
     reverse_proxy localhost:8888
-}
-
-# circle.slop.computer — the greyscale "base slop computer" (E2EE circles).
-# A separate app co-hosted on this box: its own relay on :8789 (serves both
-# the static client and the /signal + /v1 + /turn API). Kept here so
-# ops/deploy.sh doesn't clobber the vhost on the next slop deploy.
-circle.slop.computer {
-    encode zstd gzip
-    reverse_proxy localhost:8789
 }

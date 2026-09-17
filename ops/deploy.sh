@@ -20,7 +20,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # stale-lock detection still works.
 LOCK_DIR="/tmp/slop-deploy.lock"
 LOCK_PID_FILE="$LOCK_DIR/pid"
-PROD_HOST="slopcomputer"
+PROD_HOST="hostinger-vps"
 PROD_PATH="/home/ubuntu/slop-computer-live"
 
 # --- Concurrency lock --------------------------------------------------------
@@ -86,26 +86,26 @@ yarn next:build
 #
 # We assert the *presence* of the resolved live URLs, not the *absence* of
 # localhost: when the env IS set, `EXPR ?? "http://localhost:8080"` inlines to
-# `"https://live.slop.computer" ?? "http://localhost:8080"` and the minifier
+# `"https://live.alices.news" ?? "http://localhost:8080"` and the minifier
 # leaves the dead fallback literal in a couple of chunks — harmless, but it
-# means an absence check false-positives. These wss://live.slop.computer
+# means an absence check false-positives. These wss://live.alices.news
 # literals can ONLY appear when NEXT_PUBLIC_RELAY_URL / _BROWSER_HOST_URL baked
 # in (their code fallbacks are ws://slop.computer/signal and ws://localhost:8090).
 echo ""
 echo "→ Verifying baked relay URLs…"
 nextstatic="packages/nextjs/.next/static"
-for needle in "wss://live.slop.computer/signal" "wss://live.slop.computer/browser"; do
+for needle in "wss://live.alices.news/signal" "wss://live.alices.news/browser"; do
   if ! grep -rq "$needle" "$nextstatic" 2>/dev/null; then
     echo "✗ Built bundle is missing '$needle' — a NEXT_PUBLIC_RELAY_* var fell"
     echo "  back to its dev default. Set the live URLs in packages/nextjs/.env.local:"
-    echo "    NEXT_PUBLIC_RELAY_HTTP_URL=https://live.slop.computer"
-    echo "    NEXT_PUBLIC_RELAY_URL=wss://live.slop.computer/signal"
-    echo "    NEXT_PUBLIC_BROWSER_HOST_URL=wss://live.slop.computer/browser"
+    echo "    NEXT_PUBLIC_RELAY_HTTP_URL=https://live.alices.news"
+    echo "    NEXT_PUBLIC_RELAY_URL=wss://live.alices.news/signal"
+    echo "    NEXT_PUBLIC_BROWSER_HOST_URL=wss://live.alices.news/browser"
     echo "  then rebuild."
     exit 1
   fi
 done
-echo "✓ Bundle resolves to live.slop.computer relay/browser URLs"
+echo "✓ Bundle resolves to live.alices.news relay/browser URLs"
 
 echo ""
 echo "→ Building relay…"
@@ -226,7 +226,7 @@ ssh "$PROD_HOST" "
 echo "→ Waiting for HTTPS recovery…"
 http_back=""
 for i in $(seq 1 60); do
-  if curl -s -m 2 -o /dev/null -w "%{http_code}" "https://live.slop.computer/" 2>/dev/null | grep -qE '^[23]'; then
+  if curl -s -m 2 -o /dev/null -w "%{http_code}" "https://live.alices.news/" 2>/dev/null | grep -qE '^[23]'; then
     http_back="yes"
     break
   fi
